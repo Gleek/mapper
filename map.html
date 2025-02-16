@@ -2,107 +2,216 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content=
+  "width=device-width, initial-scale=1.0">
   <title>Leaflet MarkerCluster with KML Upload</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css">
+  <link rel="stylesheet" href=
+  "https://unpkg.com/leaflet/dist/leaflet.css">
+  <link rel="stylesheet" href=
+  "https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css">
+  <link rel="stylesheet" href=
+  "https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css">
+
   <style>
-        #map {
-            height: 90vh;
-        }
-        #upload {
-            margin: 10px;
-        }
-        #toggle-clustering {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            z-index: 1000;
-            background: white;
-            padding: 5px;
-            border: 1px solid #ccc;
-        }
+      #map {
+        height: 90vh;
+      }
+      #upload {
+        margin: 10px;
+      }
+      #toggle-clustering {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        background: white;
+        padding: 5px;
+        border: 1px solid #ccc;
+      }
+      .distance-label {
+        background-color: rgba(255, 255, 255, 0.8);
+        border: 1px solid #000;
+        padding: 2px 5px;
+        border-radius: 3px;
+        font-size: 12px;
+        text-align: center;
+      }
   </style>
 </head>
 <body>
   <input type="file" id="upload" accept=".kml">
   <div id="toggle-clustering">
-    <label><input type="checkbox" id="clustering-toggle">
-    Enable Clustering</label>
+    <label><input type="checkbox" id="clustering-toggle"> Enable
+    Clustering</label>
   </div>
   <div id="map"></div>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
-  <script src="https://unpkg.com/leaflet-omnivore/leaflet-omnivore.min.js"></script>
+
+  <script src=
+  "https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+
+  <script src=
+  "https://unpkg.com/leaflet-omnivore/leaflet-omnivore.min.js"></script>
+
   <script>
-        // Initialize the map
-        var map = L.map("map").setView([0, 0], 2);
 
-        var googleStreets = L.tileLayer(
-            "http://{s}.google.com/vt?lyrs=m&x={x}&y={y}&z={z}",
-            {
-                maxZoom: 20,
-                subdomains: ["mt0", "mt1", "mt2", "mt3"],
-            }
-        );
 
-        googleStreets.addTo(map);
+      // Initialize the map
+      var map = L.map("map").setView([0, 0], 2);
 
-        // Create a marker cluster group
-        var markers = L.markerClusterGroup({
-            maxClusterRadius: 40
+      var googleStreets = L.tileLayer(
+        "http://{s}.google.com/vt?lyrs=m&x={x}&y={y}&z={z}",
+        {
+          maxZoom: 20,
+          subdomains: ["mt0", "mt1", "mt2", "mt3"],
+        }
+      );
+
+      googleStreets.addTo(map);
+      // Add scale control to the map
+      L.control.scale().addTo(map);
+
+      // Create a marker cluster group
+      var markers = L.markerClusterGroup({
+        maxClusterRadius: 40,
+      });
+
+      // Create a layer group for non-clustered markers
+      var nonClusteredMarkers = L.layerGroup();
+
+      // Add the marker cluster group to the map
+      map.addLayer(nonClusteredMarkers);
+      // Variables to store the points and the line
+      let rightClickCount = 0;
+      let firstPoint = null;
+      let secondPoint = null;
+      let distanceLine = null;
+      let distanceLabel = null;
+
+      // Handle file upload
+      document
+        .getElementById("upload")
+        .addEventListener("change", function (event) {
+          var file = event.target.files[0];
+          if (file && file.name.endsWith(".kml")) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+              var kmlText = e.target.result;
+              var kmlLayer = omnivore.kml.parse(kmlText);
+              markers.clearLayers();
+              nonClusteredMarkers.clearLayers();
+              kmlLayer.eachLayer(function (layer) {
+                var latlng = layer.getLatLng();
+                var circleMarker = L.circleMarker(latlng, {
+                  radius: 5, // small radius
+                  color: "#3388ff",
+                  fillColor: "#3388ff",
+                  weight: 1,
+                  fillOpacity: 0.5, // semi-transparent
+                });
+                if (
+                  layer.feature &&
+                  layer.feature.properties &&
+                  layer.feature.properties.name
+                ) {
+                  circleMarker.bindPopup(layer.feature.properties.name);
+                }
+                markers.addLayer(circleMarker);
+                nonClusteredMarkers.addLayer(circleMarker);
+              });
+              map.fitBounds(markers.getBounds());
+            };
+            reader.readAsText(file);
+          } else {
+            alert("Please upload a valid KML file.");
+          }
         });
 
-        // Create a layer group for non-clustered markers
-        var nonClusteredMarkers = L.layerGroup();
-
-        // Add the marker cluster group to the map
-        map.addLayer(nonClusteredMarkers);
-
-        // Handle file upload
-        document.getElementById("upload").addEventListener("change", function (event) {
-            var file = event.target.files[0];
-            if (file && file.name.endsWith(".kml")) {
-                var reader = new FileReader();
-                reader.onload = function (e) {
-                    var kmlText = e.target.result;
-                    var kmlLayer = omnivore.kml.parse(kmlText);
-                    markers.clearLayers();
-                    nonClusteredMarkers.clearLayers();
-                    kmlLayer.eachLayer(function (layer) {
-                        var latlng = layer.getLatLng();
-                        var circleMarker = L.circleMarker(latlng, {
-                            radius: 5, // small radius
-                            color: '#3388ff',
-                            fillColor: '#3388ff',
-                            weight: 1,
-                            fillOpacity: 0.5 // semi-transparent
-                        });
-                        if (layer.feature && layer.feature.properties && layer.feature.properties.name) {
-                            circleMarker.bindPopup(layer.feature.properties.name);
-                        }
-                        markers.addLayer(circleMarker);
-                        nonClusteredMarkers.addLayer(circleMarker);
-                    });
-                    map.fitBounds(markers.getBounds());
-                };
-                reader.readAsText(file);
-            } else {
-                alert("Please upload a valid KML file.");
-            }
+      // Handle clustering toggle
+      document
+        .getElementById("clustering-toggle")
+        .addEventListener("change", function (event) {
+          if (event.target.checked) {
+            map.removeLayer(nonClusteredMarkers);
+            map.addLayer(markers);
+          } else {
+            map.removeLayer(markers);
+            map.addLayer(nonClusteredMarkers);
+          }
         });
+      // Handle right-clicks for measuring distance
+      map.on("contextmenu", function (e) {
+        rightClickCount += 1;
 
-        // Handle clustering toggle
-        document.getElementById("clustering-toggle").addEventListener("change", function (event) {
-            if (event.target.checked) {
-                map.removeLayer(nonClusteredMarkers);
-                map.addLayer(markers);
-            } else {
-                map.removeLayer(markers);
-                map.addLayer(nonClusteredMarkers);
+        if (rightClickCount === 1) {
+          // First right-click: store the first point
+          firstPoint = e.latlng;
+          // Add a marker for the first point without a popup and assign a customId
+          var firstMarker = L.marker(firstPoint, {
+            icon: L.icon({ iconUrl: "https://example.com/marker-icon.png" }),
+          }).addTo(map);
+          firstMarker.customId = "firstPoint";
+        } else if (rightClickCount === 2) {
+          // Second right-click: store the second point and draw the line
+          secondPoint = e.latlng;
+          // Add marker for the second point without a popup and assign custom property
+          var secondMarker = L.marker(secondPoint, {
+            icon: L.icon({ iconUrl: "https://example.com/marker-icon.png" }),
+          }).addTo(map);
+          secondMarker.customId = "secondPoint";
+          // Draw the line
+          distanceLine = L.polyline([firstPoint, secondPoint], {
+            color: "black",
+          }).addTo(map);
+          // Calculate distance in meters
+          const distance = map.distance(firstPoint, secondPoint);
+          const distanceText =
+            distance >= 1000
+              ? (distance / 1000).toFixed(2) + " km"
+              : distance.toFixed(2) + " m";
+          // Add distance label at the midpoint
+          const midPoint = L.latLng(
+            (firstPoint.lat + secondPoint.lat) / 2,
+            (firstPoint.lng + secondPoint.lng) / 2
+          );
+          distanceLabel = L.marker(midPoint, {
+            icon: L.divIcon({
+              className: "distance-label",
+              html: distanceText,
+              iconSize: [100, 40],
+              iconAnchor: [50, 20],
+            }),
+          }).addTo(map);
+        } else if (rightClickCount === 3) {
+          // Third right-click: clear the line and labels
+          if (distanceLine) {
+            map.removeLayer(distanceLine);
+            distanceLine = null;
+          }
+          if (distanceLabel) {
+            map.removeLayer(distanceLabel);
+            distanceLabel = null;
+          }
+          // Remove all related markers
+          map.eachLayer(function (layer) {
+            if (layer instanceof L.Marker) {
+              if (
+                layer.customId === "firstPoint" ||
+                layer.customId === "secondPoint"
+              ) {
+                map.removeLayer(layer);
+              }
             }
-        });
+          });
+          // Reset points and counter
+          firstPoint = null;
+          secondPoint = null;
+          rightClickCount = 0;
+        } else {
+          // Reset after the third right-click
+          rightClickCount = 0;
+        }
+      });
   </script>
 </body>
 </html>
