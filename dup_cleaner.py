@@ -1,5 +1,15 @@
 import xml.etree.ElementTree as ET
 import sys
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("dup_cleaner.log"),
+        logging.StreamHandler()
+    ]
+)
 
 def truncate_coordinates(coordinates, decimal_places):
     if decimal_places is None:
@@ -35,6 +45,12 @@ def remove_duplicates(input_file, output_file, decimal_places=None):
         truncated_coords = truncate_coordinates(coordinates, decimal_places)
         if truncated_coords not in unique_placemarks:
             unique_placemarks[truncated_coords] = placemark
+        else:
+            placemark_name_elem = placemark.find('.//kml:name', namespaces)
+            placemark_name = placemark_name_elem.text.strip() if placemark_name_elem is not None else 'Unnamed Placemark'
+            logging.info(
+                f"Duplicate found: Name='{placemark_name}', Coordinates='{truncated_coords}'"
+            )
 
     # Remove all placemarks from the document
     for placemark in placemarks:
@@ -44,6 +60,8 @@ def remove_duplicates(input_file, output_file, decimal_places=None):
     # Add unique placemarks back to the document
     for placemark in unique_placemarks.values():
         document.append(placemark)
+    total_duplicates = len(placemarks) - len(unique_placemarks)
+    logging.info(f"Total duplicates found and removed: {total_duplicates}")
 
     # Register namespace to avoid ns0 prefix
     ET.register_namespace('', 'http://www.opengis.net/kml/2.2')
